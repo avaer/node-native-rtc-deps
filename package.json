@@ -7,6 +7,7 @@
     "lib": "lib"
   },
   "scripts": {
+    "postinstall": "node postinstall.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -18,5 +19,8 @@
   "bugs": {
     "url": "https://github.com/modulesio/node-native-rtc-deps/issues"
   },
-  "homepage": "https://github.com/modulesio/node-native-rtc-deps#readme"
+  "homepage": "https://github.com/modulesio/node-native-rtc-deps#readme",
+  "dependencies": {
+    "unzip": "^0.1.11"
+  }
 }
