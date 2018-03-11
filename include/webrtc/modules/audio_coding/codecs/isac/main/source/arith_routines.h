@@ -18,7 +18,8 @@
 #ifndef MODULES_AUDIO_CODING_CODECS_ISAC_MAIN_SOURCE_ARITH_ROUTINES_H_
 #define MODULES_AUDIO_CODING_CODECS_ISAC_MAIN_SOURCE_ARITH_ROUTINES_H_
 
-#include "modules/audio_coding/codecs/isac/main/source/structs.h"
+#include "structs.h"
+
 
 int WebRtcIsac_EncLogisticMulti2(
     Bitstr *streamdata,              /* in-/output struct containing bitstream */

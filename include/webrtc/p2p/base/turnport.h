@@ -260,7 +260,7 @@ class TurnPort : public Port {
       const rtc::SocketAddress& remote_addr,
       ProtocolType proto, const rtc::PacketTime& packet_time);
 
-  bool ScheduleRefresh(uint32_t lifetime);
+  bool ScheduleRefresh(int lifetime);
   void SendRequest(StunRequest* request, int delay);
   int Send(const void* data, size_t size,
            const rtc::PacketOptions& options);

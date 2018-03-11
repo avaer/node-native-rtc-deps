@@ -80,8 +80,7 @@ class RTCPSender {
              ReceiveStatisticsProvider* receive_statistics,
              RtcpPacketTypeCounterObserver* packet_type_counter_observer,
              RtcEventLog* event_log,
-             Transport* outgoing_transport,
-             RtcpIntervalConfig interval_config);
+             Transport* outgoing_transport);
   virtual ~RTCPSender();
 
   RtcpMode Status() const;
@@ -149,9 +148,6 @@ class RTCPSender {
   void SetVideoBitrateAllocation(const BitrateAllocation& bitrate);
   bool SendFeedbackPacket(const rtcp::TransportFeedback& packet);
 
-  int64_t RtcpAudioReportInverval() const;
-  int64_t RtcpVideoReportInverval() const;
-
  private:
   class RtcpContext;
 
@@ -197,8 +193,6 @@ class RTCPSender {
 
   RtcEventLog* const event_log_;
   Transport* const transport_;
-
-  const RtcpIntervalConfig interval_config_;
 
   rtc::CriticalSection critical_section_rtcp_sender_;
   bool using_nack_ RTC_GUARDED_BY(critical_section_rtcp_sender_);

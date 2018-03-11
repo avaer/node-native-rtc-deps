@@ -35,7 +35,7 @@ class RtpReceiverImpl : public RtpReceiver {
                   RTPPayloadRegistry* rtp_payload_registry,
                   RTPReceiverStrategy* rtp_media_receiver);
 
-  ~RtpReceiverImpl() override;
+  virtual ~RtpReceiverImpl();
 
   int32_t RegisterReceivePayload(int payload_type,
                                  const SdpAudioFormat& audio_format) override;

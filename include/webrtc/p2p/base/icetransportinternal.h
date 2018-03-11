@@ -110,29 +110,10 @@ struct IceConfig {
   // Default nomination mode if the remote does not support renomination.
   NominationMode default_nomination_mode = NominationMode::SEMI_AGGRESSIVE;
 
-  // The interval in milliseconds at which ICE checks (STUN pings) will be sent
-  // for a candidate pair when it is both writable and receiving (strong
-  // connectivity). This parameter overrides the default value given by
-  // |STRONG_PING_INTERVAL| in p2ptransport.h if set.
-  rtc::Optional<int> ice_check_interval_strong_connectivity;
-  // The interval in milliseconds at which ICE checks (STUN pings) will be sent
-  // for a candidate pair when it is either not writable or not receiving (weak
-  // connectivity). This parameter overrides the default value given by
-  // |WEAK_PING_INTERVAL| in p2ptransport.h if set.
-  rtc::Optional<int> ice_check_interval_weak_connectivity;
   // ICE checks (STUN pings) will not be sent at higher rate (lower interval)
   // than this, no matter what other settings there are.
   // Measure in milliseconds.
-  //
-  // Note that this parameter overrides both the above check intervals for
-  // candidate pairs with strong or weak connectivity, if either of the above
-  // interval is shorter than the min interval.
   rtc::Optional<int> ice_check_min_interval;
-  // The interval in milliseconds at which STUN candidates will resend STUN
-  // binding requests to keep NAT bindings open.
-  rtc::Optional<int> stun_keepalive_interval;
-
-  rtc::Optional<rtc::AdapterType> network_preference;
 
   IceConfig();
   IceConfig(int receiving_timeout_ms,
@@ -142,8 +123,7 @@ struct IceConfig {
             int stable_writable_connection_ping_interval_ms,
             bool presume_writable_when_fully_relayed,
             int regather_on_failed_networks_interval_ms,
-            int receiving_switching_delay_ms,
-            rtc::Optional<rtc::AdapterType> network_preference);
+            int receiving_switching_delay_ms);
   ~IceConfig();
 };
 
@@ -215,8 +195,7 @@ class IceTransportInternal : public rtc::PacketTransportInternal {
   virtual IceGatheringState gathering_state() const = 0;
 
   // Returns the current stats for this connection.
-  virtual bool GetStats(ConnectionInfos* candidate_pair_stats_list,
-                        CandidateStatsList* candidate_stats_list) = 0;
+  virtual bool GetStats(ConnectionInfos* infos) = 0;
 
   // Returns RTT estimate over the currently active connection, or an empty
   // rtc::Optional if there is none.

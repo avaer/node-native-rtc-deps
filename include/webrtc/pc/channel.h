@@ -28,8 +28,10 @@
 #include "media/base/streamparams.h"
 #include "p2p/base/dtlstransportinternal.h"
 #include "p2p/base/packettransportinternal.h"
+#include "p2p/client/socketmonitor.h"
 #include "pc/audiomonitor.h"
 #include "pc/dtlssrtptransport.h"
+#include "pc/mediamonitor.h"
 #include "pc/mediasession.h"
 #include "pc/rtcpmuxfilter.h"
 #include "pc/rtptransport.h"
@@ -71,7 +73,8 @@ class MediaContentDescription;
 
 class BaseChannel
     : public rtc::MessageHandler, public sigslot::has_slots<>,
-      public MediaChannel::NetworkInterface {
+      public MediaChannel::NetworkInterface,
+      public ConnectionStatsGetter {
  public:
   // If |srtp_required| is true, the channel will not send or receive any
   // RTP/RTCP packets without using SRTP (either using SDES or DTLS-SRTP).
@@ -150,6 +153,12 @@ class BaseChannel
   bool RemoveRecvStream(uint32_t ssrc);
   bool AddSendStream(const StreamParams& sp);
   bool RemoveSendStream(uint32_t ssrc);
+
+  // Monitoring
+  void StartConnectionMonitor(int cms);
+  void StopConnectionMonitor();
+  // For ConnectionStatsGetter, used by ConnectionMonitor
+  bool GetConnectionStats(ConnectionInfos* infos) override;
 
   const std::vector<StreamParams>& local_streams() const {
     return local_streams_;
@@ -265,9 +274,9 @@ class BaseChannel
   void HandlePacket(bool rtcp, rtc::CopyOnWriteBuffer* packet,
                     const rtc::PacketTime& packet_time);
   // TODO(zstein): packet can be const once the RtpTransport handles protection.
-  void OnPacketReceived(bool rtcp,
-                        rtc::CopyOnWriteBuffer* packet,
-                        const rtc::PacketTime& packet_time);
+  virtual void OnPacketReceived(bool rtcp,
+                                rtc::CopyOnWriteBuffer* packet,
+                                const rtc::PacketTime& packet_time);
   void ProcessPacket(bool rtcp,
                      const rtc::CopyOnWriteBuffer& packet,
                      const rtc::PacketTime& packet_time);
@@ -349,6 +358,10 @@ class BaseChannel
   // From MessageHandler
   void OnMessage(rtc::Message* pmsg) override;
 
+  // Handled in derived classes
+  virtual void OnConnectionMonitorUpdate(ConnectionMonitor* monitor,
+      const std::vector<ConnectionInfo>& infos) = 0;
+
   // Helper function template for invoking methods on the worker thread.
   template <class T, class FunctorT>
   T InvokeOnWorker(const rtc::Location& posted_from, const FunctorT& functor) {
@@ -389,6 +402,7 @@ class BaseChannel
   rtc::AsyncInvoker invoker_;
 
   const std::string content_name_;
+  std::unique_ptr<ConnectionMonitor> connection_monitor_;
 
   // Won't be set when using raw packet transports. SDP-specific thing.
   std::string transport_name_;
@@ -450,18 +464,52 @@ class VoiceChannel : public BaseChannel {
                bool srtp_required);
   ~VoiceChannel();
 
+  // Configure sending media on the stream with SSRC |ssrc|
+  // If there is only one sending stream SSRC 0 can be used.
+  bool SetAudioSend(uint32_t ssrc,
+                    bool enable,
+                    const AudioOptions* options,
+                    AudioSource* source);
+
   // downcasts a MediaChannel
   VoiceMediaChannel* media_channel() const override {
     return static_cast<VoiceMediaChannel*>(BaseChannel::media_channel());
   }
 
+  void SetEarlyMedia(bool enable);
+  // This signal is emitted when we have gone a period of time without
+  // receiving early media. When received, a UI should start playing its
+  // own ringing sound
+  sigslot::signal1<VoiceChannel*> SignalEarlyMediaTimeout;
+
+  // Get statistics about the current media session.
+  bool GetStats(VoiceMediaInfo* stats);
+
+  // Monitoring functions
+  sigslot::signal2<VoiceChannel*, const std::vector<ConnectionInfo>&>
+      SignalConnectionMonitor;
+
+  void StartMediaMonitor(int cms);
+  void StopMediaMonitor();
+  sigslot::signal2<VoiceChannel*, const VoiceMediaInfo&> SignalMediaMonitor;
+
+  void StartAudioMonitor(int cms);
+  void StopAudioMonitor();
+  bool IsAudioMonitorRunning() const;
+  sigslot::signal2<VoiceChannel*, const AudioInfo&> SignalAudioMonitor;
+
+  int GetInputLevel_w();
+  int GetOutputLevel_w();
+  void GetActiveStreams_w(AudioInfo::StreamList* actives);
   webrtc::RtpParameters GetRtpSendParameters_w(uint32_t ssrc) const;
-  webrtc::RTCError SetRtpSendParameters_w(uint32_t ssrc,
-                                          webrtc::RtpParameters parameters);
+  bool SetRtpSendParameters_w(uint32_t ssrc, webrtc::RtpParameters parameters);
   cricket::MediaType media_type() override { return cricket::MEDIA_TYPE_AUDIO; }
 
  private:
   // overrides from BaseChannel
+  void OnPacketReceived(bool rtcp,
+                        rtc::CopyOnWriteBuffer* packet,
+                        const rtc::PacketTime& packet_time) override;
   void UpdateMediaSendRecvState_w() override;
   bool SetLocalContent_w(const MediaContentDescription* content,
                          webrtc::SdpType type,
@@ -469,6 +517,21 @@ class VoiceChannel : public BaseChannel {
   bool SetRemoteContent_w(const MediaContentDescription* content,
                           webrtc::SdpType type,
                           std::string* error_desc) override;
+  void HandleEarlyMediaTimeout();
+
+  void OnMessage(rtc::Message* pmsg) override;
+  void OnConnectionMonitorUpdate(
+      ConnectionMonitor* monitor,
+      const std::vector<ConnectionInfo>& infos) override;
+  void OnMediaMonitorUpdate(VoiceMediaChannel* media_channel,
+                            const VoiceMediaInfo& info);
+  void OnAudioMonitorUpdate(AudioMonitor* monitor, const AudioInfo& info);
+
+  static const int kEarlyMediaTimeout = 1000;
+  MediaEngineInterface* media_engine_;
+  bool received_media_ = false;
+  std::unique_ptr<VoiceMediaMonitor> media_monitor_;
+  std::unique_ptr<AudioMonitor> audio_monitor_;
 
   // Last AudioSendParameters sent down to the media_channel() via
   // SetSendParameters.
@@ -496,6 +559,15 @@ class VideoChannel : public BaseChannel {
   }
 
   void FillBitrateInfo(BandwidthEstimationInfo* bwe_info);
+  // Get statistics about the current media session.
+  bool GetStats(VideoMediaInfo* stats);
+
+  sigslot::signal2<VideoChannel*, const std::vector<ConnectionInfo>&>
+      SignalConnectionMonitor;
+
+  void StartMediaMonitor(int cms);
+  void StopMediaMonitor();
+  sigslot::signal2<VideoChannel*, const VideoMediaInfo&> SignalMediaMonitor;
 
   cricket::MediaType media_type() override { return cricket::MEDIA_TYPE_VIDEO; }
 
@@ -508,6 +580,15 @@ class VideoChannel : public BaseChannel {
   bool SetRemoteContent_w(const MediaContentDescription* content,
                           webrtc::SdpType type,
                           std::string* error_desc) override;
+  bool GetStats_w(VideoMediaInfo* stats);
+
+  void OnConnectionMonitorUpdate(
+      ConnectionMonitor* monitor,
+      const std::vector<ConnectionInfo>& infos) override;
+  void OnMediaMonitorUpdate(VideoMediaChannel* media_channel,
+                            const VideoMediaInfo& info);
+
+  std::unique_ptr<VideoMediaMonitor> media_monitor_;
 
   // Last VideoSendParameters sent down to the media_channel() via
   // SetSendParameters.
@@ -540,10 +621,17 @@ class RtpDataChannel : public BaseChannel {
                         const rtc::CopyOnWriteBuffer& payload,
                         SendDataResult* result);
 
+  void StartMediaMonitor(int cms);
+  void StopMediaMonitor();
+
   // Should be called on the signaling thread only.
   bool ready_to_send_data() const {
     return ready_to_send_data_;
   }
+
+  sigslot::signal2<RtpDataChannel*, const DataMediaInfo&> SignalMediaMonitor;
+  sigslot::signal2<RtpDataChannel*, const std::vector<ConnectionInfo>&>
+      SignalConnectionMonitor;
 
   sigslot::signal2<const ReceiveDataParams&, const rtc::CopyOnWriteBuffer&>
       SignalDataReceived;
@@ -604,10 +692,16 @@ class RtpDataChannel : public BaseChannel {
   void UpdateMediaSendRecvState_w() override;
 
   void OnMessage(rtc::Message* pmsg) override;
+  void OnConnectionMonitorUpdate(
+      ConnectionMonitor* monitor,
+      const std::vector<ConnectionInfo>& infos) override;
+  void OnMediaMonitorUpdate(DataMediaChannel* media_channel,
+                            const DataMediaInfo& info);
   void OnDataReceived(
       const ReceiveDataParams& params, const char* data, size_t len);
   void OnDataChannelReadyToSend(bool writable);
 
+  std::unique_ptr<DataMediaMonitor> media_monitor_;
   bool ready_to_send_data_ = false;
 
   // Last DataSendParameters sent down to the media_channel() via

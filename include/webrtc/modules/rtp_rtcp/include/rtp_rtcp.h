@@ -94,10 +94,6 @@ class RtpRtcp : public Module, public RtcpFeedbackSenderInterface {
     RateLimiter* retransmission_rate_limiter = nullptr;
     OverheadObserver* overhead_observer = nullptr;
     RtpKeepAliveConfig keepalive_config;
-    RtcpIntervalConfig rtcp_interval_config;
-
-    // Update network2 instead of pacer_exit field of video timing extension.
-    bool populate_network2_timestamp = false;
 
    private:
     RTC_DISALLOW_COPY_AND_ASSIGN(Configuration);
@@ -129,6 +125,9 @@ class RtpRtcp : public Module, public RtcpFeedbackSenderInterface {
 
   // Sets codec name and payload type. Returns -1 on failure else 0.
   virtual int32_t RegisterSendPayload(const CodecInst& voice_codec) = 0;
+
+  // Sets codec name and payload type. Return -1 on failure else 0.
+  virtual int32_t RegisterSendPayload(const VideoCodec& video_codec) = 0;
 
   virtual void RegisterVideoSendPayload(int payload_type,
                                         const char* payload_name) = 0;

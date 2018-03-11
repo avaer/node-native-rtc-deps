@@ -29,7 +29,7 @@ class StreamStatisticianImpl : public StreamStatistician {
                          Clock* clock,
                          RtcpStatisticsCallback* rtcp_callback,
                          StreamDataCountersCallback* rtp_callback);
-  ~StreamStatisticianImpl() override;
+  virtual ~StreamStatisticianImpl() {}
 
   // |reset| here and in next method restarts calculation of fraction_lost stat.
   bool GetStatistics(RtcpStatistics* statistics, bool reset) override;
@@ -96,7 +96,7 @@ class ReceiveStatisticsImpl : public ReceiveStatistics,
  public:
   explicit ReceiveStatisticsImpl(Clock* clock);
 
-  ~ReceiveStatisticsImpl() override;
+  ~ReceiveStatisticsImpl();
 
   // Implement ReceiveStatisticsProvider.
   std::vector<rtcp::ReportBlock> RtcpReportBlocks(size_t max_blocks) override;

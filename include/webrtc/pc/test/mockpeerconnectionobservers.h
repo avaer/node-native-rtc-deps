@@ -132,11 +132,6 @@ class MockPeerConnectionObserver : public PeerConnectionObserver {
     add_track_events_.push_back(AddTrackEvent(receiver, streams));
   }
 
-  void OnTrack(
-      rtc::scoped_refptr<RtpTransceiverInterface> transceiver) override {
-    on_track_transceivers_.push_back(transceiver);
-  }
-
   void OnRemoveTrack(
       rtc::scoped_refptr<RtpReceiverInterface> receiver) override {
     remove_track_events_.push_back(receiver);
@@ -150,33 +145,16 @@ class MockPeerConnectionObserver : public PeerConnectionObserver {
     return receivers;
   }
 
-  int CountAddTrackEventsForStream(const std::string& stream_id) {
-    int found_tracks = 0;
-    for (const AddTrackEvent& event : add_track_events_) {
-      bool has_stream_id = false;
-      for (auto stream : event.streams) {
-        if (stream->id() == stream_id) {
-          has_stream_id = true;
-          break;
-        }
-      }
-      if (has_stream_id) {
-        ++found_tracks;
-      }
-    }
-    return found_tracks;
-  }
-
-  // Returns the id of the last added stream.
+  // Returns the label of the last added stream.
   // Empty string if no stream have been added.
-  std::string GetLastAddedStreamId() {
+  std::string GetLastAddedStreamLabel() {
     if (last_added_stream_.get())
-      return last_added_stream_->id();
+      return last_added_stream_->label();
     return "";
   }
-  std::string GetLastRemovedStreamId() {
+  std::string GetLastRemovedStreamLabel() {
     if (last_removed_stream_.get())
-      return last_removed_stream_->id();
+      return last_removed_stream_->label();
     return "";
   }
 
@@ -214,8 +192,6 @@ class MockPeerConnectionObserver : public PeerConnectionObserver {
   std::string last_added_track_label_;
   std::vector<AddTrackEvent> add_track_events_;
   std::vector<rtc::scoped_refptr<RtpReceiverInterface>> remove_track_events_;
-  std::vector<rtc::scoped_refptr<RtpTransceiverInterface>>
-      on_track_transceivers_;
   int num_candidates_removed_ = 0;
 
  private:
@@ -230,14 +206,14 @@ class MockCreateSessionDescriptionObserver
       : called_(false),
         error_("MockCreateSessionDescriptionObserver not called") {}
   virtual ~MockCreateSessionDescriptionObserver() {}
-  void OnSuccess(SessionDescriptionInterface* desc) override {
+  virtual void OnSuccess(SessionDescriptionInterface* desc) {
     called_ = true;
     error_ = "";
     desc_.reset(desc);
   }
-  void OnFailure(webrtc::RTCError error) override {
+  virtual void OnFailure(const std::string& error) {
     called_ = true;
-    error_ = error.message();
+    error_ = error;
   }
   bool called() const { return called_; }
   bool result() const { return error_.empty(); }
@@ -263,11 +239,10 @@ class MockSetSessionDescriptionObserver
     called_ = true;
     error_ = "";
   }
-  void OnFailure(webrtc::RTCError error) override {
+  void OnFailure(const std::string& error) override {
     called_ = true;
-    error_ = error.message();
+    error_ = error;
   }
-
   bool called() const { return called_; }
   bool result() const { return error_.empty(); }
   const std::string& error() const { return error_; }

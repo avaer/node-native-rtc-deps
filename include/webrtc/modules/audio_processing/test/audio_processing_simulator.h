@@ -66,6 +66,7 @@ struct SimulationSettings {
   rtc::Optional<bool> use_extended_filter;
   rtc::Optional<bool> use_drift_compensation;
   rtc::Optional<bool> use_aec3;
+  rtc::Optional<bool> use_lc;
   rtc::Optional<bool> use_experimental_agc;
   rtc::Optional<int> aecm_routing_mode;
   rtc::Optional<bool> use_aecm_comfort_noise;
@@ -89,7 +90,6 @@ struct SimulationSettings {
   bool fixed_interface = false;
   bool store_intermediate_output = false;
   rtc::Optional<std::string> custom_call_order_filename;
-  rtc::Optional<std::string> aec3_settings_filename;
 };
 
 // Holds a few statistics about a series of TickIntervals.

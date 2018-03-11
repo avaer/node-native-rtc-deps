@@ -192,6 +192,7 @@ class TestVp8Simulcast : public ::testing::Test {
                               const int* temporal_layer_profile) {
     RTC_CHECK(settings);
     memset(settings, 0, sizeof(VideoCodec));
+    strncpy(settings->plName, "VP8", 4);
     settings->codecType = kVideoCodecVP8;
     // 96 to 127 dynamic payload types for video codecs
     settings->plType = 120;
@@ -202,7 +203,6 @@ class TestVp8Simulcast : public ::testing::Test {
     settings->width = kDefaultWidth;
     settings->height = kDefaultHeight;
     settings->numberOfSimulcastStreams = kNumberOfSimulcastStreams;
-    settings->active = true;
     ASSERT_EQ(3, kNumberOfSimulcastStreams);
     settings->timing_frame_thresholds = {kDefaultTimingFramesDelayMs,
                                          kDefaultOutlierFrameSizePercent};
@@ -217,6 +217,7 @@ class TestVp8Simulcast : public ::testing::Test {
                     &settings->simulcastStream[2], temporal_layer_profile[2]);
     settings->VP8()->resilience = kResilientStream;
     settings->VP8()->denoisingOn = true;
+    settings->VP8()->errorConcealmentOn = false;
     settings->VP8()->automaticResizeOn = false;
     settings->VP8()->frameDroppingOn = true;
     settings->VP8()->keyFrameInterval = 3000;
@@ -237,7 +238,6 @@ class TestVp8Simulcast : public ::testing::Test {
     stream->targetBitrate = target_bitrate;
     stream->numberOfTemporalLayers = num_temporal_layers;
     stream->qpMax = 45;
-    stream->active = true;
   }
 
  protected:
@@ -282,43 +282,10 @@ class TestVp8Simulcast : public ::testing::Test {
         rate_allocator_->GetAllocation(bitrate_kbps * 1000, fps), fps);
   }
 
-  void RunActiveStreamsTest(const std::vector<bool> active_streams) {
-    std::vector<FrameType> frame_types(kNumberOfSimulcastStreams,
-                                       kVideoFrameDelta);
-    UpdateActiveStreams(active_streams);
-    // Set sufficient bitrate for all streams so we can test active without
-    // bitrate being an issue.
-    SetRates(kMaxBitrates[0] + kMaxBitrates[1] + kMaxBitrates[2], 30);
-
-    ExpectStreams(kVideoFrameKey, active_streams);
-    input_frame_->set_timestamp(input_frame_->timestamp() + 3000);
-    EXPECT_EQ(0, encoder_->Encode(*input_frame_, NULL, &frame_types));
-
-    ExpectStreams(kVideoFrameDelta, active_streams);
-    input_frame_->set_timestamp(input_frame_->timestamp() + 3000);
-    EXPECT_EQ(0, encoder_->Encode(*input_frame_, NULL, &frame_types));
-  }
-
-  void UpdateActiveStreams(const std::vector<bool> active_streams) {
-    ASSERT_EQ(static_cast<int>(active_streams.size()),
-              kNumberOfSimulcastStreams);
-    for (size_t i = 0; i < active_streams.size(); ++i) {
-      settings_.simulcastStream[i].active = active_streams[i];
-    }
-    // Re initialize the allocator and encoder with the new settings.
-    // TODO(bugs.webrtc.org/8807): Currently, we do a full "hard"
-    // reconfiguration of the allocator and encoder. When the video bitrate
-    // allocator has support for updating active streams without a
-    // reinitialization, we can just call that here instead.
-    SetUpRateAllocator();
-    EXPECT_EQ(0, encoder_->InitEncode(&settings_, 1, 1200));
-  }
-
-  void ExpectStreams(FrameType frame_type,
-                     const std::vector<bool> expected_streams_active) {
-    ASSERT_EQ(static_cast<int>(expected_streams_active.size()),
-              kNumberOfSimulcastStreams);
-    if (expected_streams_active[0]) {
+  void ExpectStreams(FrameType frame_type, int expected_video_streams) {
+    ASSERT_GE(expected_video_streams, 0);
+    ASSERT_LE(expected_video_streams, kNumberOfSimulcastStreams);
+    if (expected_video_streams >= 1) {
       EXPECT_CALL(
           encoder_callback_,
           OnEncodedImage(
@@ -330,7 +297,7 @@ class TestVp8Simulcast : public ::testing::Test {
           .WillRepeatedly(Return(EncodedImageCallback::Result(
               EncodedImageCallback::Result::OK, 0)));
     }
-    if (expected_streams_active[1]) {
+    if (expected_video_streams >= 2) {
       EXPECT_CALL(
           encoder_callback_,
           OnEncodedImage(
@@ -342,7 +309,7 @@ class TestVp8Simulcast : public ::testing::Test {
           .WillRepeatedly(Return(EncodedImageCallback::Result(
               EncodedImageCallback::Result::OK, 0)));
     }
-    if (expected_streams_active[2]) {
+    if (expected_video_streams >= 3) {
       EXPECT_CALL(
           encoder_callback_,
           OnEncodedImage(
@@ -354,16 +321,6 @@ class TestVp8Simulcast : public ::testing::Test {
           .WillRepeatedly(Return(EncodedImageCallback::Result(
               EncodedImageCallback::Result::OK, 0)));
     }
-  }
-
-  void ExpectStreams(FrameType frame_type, int expected_video_streams) {
-    ASSERT_GE(expected_video_streams, 0);
-    ASSERT_LE(expected_video_streams, kNumberOfSimulcastStreams);
-    std::vector<bool> expected_streams_active(kNumberOfSimulcastStreams, false);
-    for (int i = 0; i < expected_video_streams; ++i) {
-      expected_streams_active[i] = true;
-    }
-    ExpectStreams(frame_type, expected_streams_active);
   }
 
   void VerifyTemporalIdxAndSyncForAllSpatialLayers(
@@ -542,25 +499,6 @@ class TestVp8Simulcast : public ::testing::Test {
     ExpectStreams(kVideoFrameKey, 3);
     input_frame_->set_timestamp(input_frame_->timestamp() + 3000);
     EXPECT_EQ(0, encoder_->Encode(*input_frame_, NULL, &frame_types));
-  }
-
-  void TestActiveStreams() {
-    // All streams on.
-    RunActiveStreamsTest({true, true, true});
-    // All streams off.
-    RunActiveStreamsTest({false, false, false});
-    // Low stream off.
-    RunActiveStreamsTest({false, true, true});
-    // Middle stream off.
-    RunActiveStreamsTest({true, false, true});
-    // High stream off.
-    RunActiveStreamsTest({true, true, false});
-    // Only low stream turned on.
-    RunActiveStreamsTest({true, false, false});
-    // Only middle stream turned on.
-    RunActiveStreamsTest({false, true, false});
-    // Only high stream turned on.
-    RunActiveStreamsTest({false, false, true});
   }
 
   void SwitchingToOneStream(int width, int height) {

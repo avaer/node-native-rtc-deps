@@ -397,7 +397,6 @@ enum class VideoType {
 };
 
 // Video codec
-// TODO(nisse): Delete together with VideoCodec::plName, below.
 enum { kPayloadNameSize = 32 };
 enum { kMaxSimulcastStreams = 4 };
 enum { kMaxSpatialLayers = 5 };
@@ -424,10 +423,13 @@ enum VP8ResilienceMode {
 class TemporalLayersFactory;
 // VP8 specific
 struct VideoCodecVP8 {
+  // TODO(nisse): Unused, delete?
+  bool pictureLossIndicationOn;
   VideoCodecComplexity complexity;
   VP8ResilienceMode resilience;
   unsigned char numberOfTemporalLayers;
   bool denoisingOn;
+  bool errorConcealmentOn;
   bool automaticResizeOn;
   bool frameDroppingOn;
   int keyFrameInterval;
@@ -483,7 +485,7 @@ enum VideoCodecType {
   kVideoCodecULPFEC,
   kVideoCodecFlexfec,
   kVideoCodecGeneric,
-  kVideoCodecMultiplex,
+  kVideoCodecStereo,
   kVideoCodecUnknown
 };
 
@@ -497,7 +499,9 @@ union VideoCodecUnion {
   VideoCodecH264 H264;
 };
 
-struct SpatialLayer {
+// Simulcast is when the same stream is encoded multiple times with different
+// settings such as resolution.
+struct SimulcastStream {
   unsigned short width;
   unsigned short height;
   unsigned char numberOfTemporalLayers;
@@ -505,12 +509,14 @@ struct SpatialLayer {
   unsigned int targetBitrate;  // kilobits/sec.
   unsigned int minBitrate;     // kilobits/sec.
   unsigned int qpMax;          // minimum quality
-  bool active;                 // encoded and sent.
 };
 
-// Simulcast is when the same stream is encoded multiple times with different
-// settings such as resolution.
-typedef SpatialLayer SimulcastStream;
+struct SpatialLayer {
+  int scaling_factor_num;
+  int scaling_factor_den;
+  int target_bitrate_bps;
+  // TODO(ivica): Add max_quantizer and min_quantizer?
+};
 
 enum VideoCodecMode { kRealtimeVideo, kScreensharing };
 
@@ -521,8 +527,6 @@ class VideoCodec {
 
   // Public variables. TODO(hta): Make them private with accessors.
   VideoCodecType codecType;
-  // TODO(nisse): Unused in webrtc, delete as soon as downstream
-  // applications are updated to not use it.
   char plName[kPayloadNameSize];
   unsigned char plType;
 
@@ -535,10 +539,6 @@ class VideoCodec {
   unsigned int targetBitrate;  // kilobits/sec.
 
   uint32_t maxFramerate;
-
-  // This enables/disables encoding and sending when there aren't multiple
-  // simulcast streams,by allocating 0 bitrate if inactive.
-  bool active;
 
   unsigned int qpMax;
   unsigned char numberOfSimulcastStreams;

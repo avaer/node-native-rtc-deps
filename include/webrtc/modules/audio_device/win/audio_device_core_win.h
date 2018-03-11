@@ -170,8 +170,6 @@ public:
     // Delay information and control
     virtual int32_t PlayoutDelay(uint16_t& delayMS) const;
 
-    virtual bool BuiltInAECIsAvailable() const;
-
     virtual int32_t EnableBuiltInAEC(bool enable);
 
 public:

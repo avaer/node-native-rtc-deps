@@ -30,7 +30,9 @@
 #ifndef MODULES_AUDIO_CODING_CODECS_ISAC_MAIN_SOURCE_FFT_H_
 #define MODULES_AUDIO_CODING_CODECS_ISAC_MAIN_SOURCE_FFT_H_
 
-#include "modules/audio_coding/codecs/isac/main/source/structs.h"
+
+#include "structs.h"
+
 
 /* double precision routine */
 

@@ -194,10 +194,6 @@ class StunMessage {
   // Creates an empty message. Overridable by derived classes.
   virtual StunMessage* CreateNew() const;
 
-  // Modify the stun magic cookie used for this STUN message.
-  // This is used for testing.
-  void SetStunMagicCookie(uint32_t val);
-
  protected:
   // Verifies that the given attribute is allowed for this message.
   virtual StunAttributeValueType GetAttributeValueType(int type) const;
@@ -211,7 +207,6 @@ class StunMessage {
   uint16_t length_;
   std::string transaction_id_;
   std::vector<std::unique_ptr<StunAttribute>> attrs_;
-  uint32_t stun_magic_cookie_;
 };
 
 // Base class for all STUN/TURN attributes.

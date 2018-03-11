@@ -60,10 +60,6 @@ class RtpPacketHistory {
 
  private:
   struct StoredPacket {
-    StoredPacket();
-    StoredPacket(StoredPacket&&);
-    StoredPacket& operator=(StoredPacket&&);
-    ~StoredPacket();
     uint16_t sequence_number = 0;
     int64_t send_time = 0;
     StorageType storage_type = kDontRetransmit;

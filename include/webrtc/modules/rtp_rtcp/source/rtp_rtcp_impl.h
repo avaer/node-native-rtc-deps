@@ -31,7 +31,6 @@ namespace webrtc {
 class ModuleRtpRtcpImpl : public RtpRtcp, public RTCPReceiver::ModuleRtpRtcp {
  public:
   explicit ModuleRtpRtcpImpl(const RtpRtcp::Configuration& configuration);
-  ~ModuleRtpRtcpImpl() override;
 
   // Returns the number of milliseconds until the module want a worker thread to
   // call Process.
@@ -51,6 +50,8 @@ class ModuleRtpRtcpImpl : public RtpRtcp, public RTCPReceiver::ModuleRtpRtcp {
   // Sender part.
 
   int32_t RegisterSendPayload(const CodecInst& voice_codec) override;
+
+  int32_t RegisterSendPayload(const VideoCodec& video_codec) override;
 
   void RegisterVideoSendPayload(int payload_type,
                                 const char* payload_name) override;

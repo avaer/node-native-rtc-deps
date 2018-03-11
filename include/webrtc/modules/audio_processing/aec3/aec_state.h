@@ -11,22 +11,18 @@
 #ifndef MODULES_AUDIO_PROCESSING_AEC3_AEC_STATE_H_
 #define MODULES_AUDIO_PROCESSING_AEC3_AEC_STATE_H_
 
-#include <math.h>
-
 #include <algorithm>
 #include <memory>
 #include <vector>
 
 #include "api/array_view.h"
-#include "api/audio/echo_canceller3_config.h"
 #include "api/optional.h"
 #include "modules/audio_processing/aec3/aec3_common.h"
-#include "modules/audio_processing/aec3/delay_estimate.h"
 #include "modules/audio_processing/aec3/echo_path_variability.h"
 #include "modules/audio_processing/aec3/erl_estimator.h"
 #include "modules/audio_processing/aec3/erle_estimator.h"
 #include "modules/audio_processing/aec3/render_buffer.h"
-#include "modules/audio_processing/aec3/suppression_gain_limiter.h"
+#include "modules/audio_processing/include/audio_processing.h"
 #include "rtc_base/constructormagic.h"
 
 namespace webrtc {
@@ -91,10 +87,8 @@ class AecState {
   // Returns the decay factor for the echo reverberation.
   float ReverbDecay() const { return reverb_decay_; }
 
-  // Returns the upper limit for the echo suppression gain.
-  float SuppressionGainLimit() const {
-    return suppression_gain_limiter_.Limit();
-  }
+  // Returns whether the echo suppression gain should be forced to zero.
+  bool ForcedZeroGain() const { return force_zero_gain_; }
 
   // Returns whether the echo in the capture signal is audible.
   bool InaudibleEcho() const { return echo_audibility_.InaudibleEcho(); }
@@ -113,8 +107,7 @@ class AecState {
   bool InitialState() const { return initial_state_; }
 
   // Updates the aec state.
-  void Update(const rtc::Optional<DelayEstimate>& delay_estimate,
-              const std::vector<std::array<float, kFftLengthBy2Plus1>>&
+  void Update(const std::vector<std::array<float, kFftLengthBy2Plus1>>&
                   adaptive_filter_frequency_response,
               const std::vector<float>& adaptive_filter_impulse_response,
               bool converged_filter,
@@ -142,7 +135,6 @@ class AecState {
 
   void UpdateReverb(const std::vector<float>& impulse_response);
   bool DetectActiveRender(rtc::ArrayView<const float> x) const;
-  void UpdateSuppressorGainLimit(bool render_activity);
   bool DetectEchoSaturation(rtc::ArrayView<const float> x);
 
   static int instance_count_;
@@ -158,28 +150,21 @@ class AecState {
   bool echo_saturation_ = false;
   bool transparent_mode_ = false;
   float previous_max_sample_ = 0.f;
+  bool force_zero_gain_ = false;
   bool render_received_ = false;
+  size_t force_zero_gain_counter_ = 0;
   int filter_delay_ = 0;
   size_t blocks_since_last_saturation_ = 1000;
-  float tail_energy_ = 0.f;
-  float accumulated_nz_ = 0.f;
-  float accumulated_nn_ = 0.f;
-  float accumulated_count_ = 0.f;
-  size_t current_reverb_decay_section_ = 0;
-  size_t num_reverb_decay_sections_ = 0;
-  size_t num_reverb_decay_sections_next_ = 0;
-  bool found_end_of_reverb_decay_ = false;
-  bool main_filter_is_adapting_ = true;
-  std::array<float, kMaxAdaptiveFilterLength> block_energies_;
+  float reverb_decay_to_test_ = 0.9f;
+  float reverb_decay_candidate_ = 0.f;
+  float reverb_decay_candidate_residual_ = -1.f;
   EchoAudibility echo_audibility_;
   const EchoCanceller3Config config_;
   std::vector<float> max_render_;
-  float reverb_decay_ = fabsf(config_.ep_strength.default_len);
+  float reverb_decay_;
   bool saturating_echo_path_ = false;
   bool filter_has_had_time_to_converge_ = false;
   bool initial_state_ = true;
-  const float gain_rampup_increase_;
-  SuppressionGainUpperLimiter suppression_gain_limiter_;
 
   RTC_DISALLOW_COPY_AND_ASSIGN(AecState);
 };

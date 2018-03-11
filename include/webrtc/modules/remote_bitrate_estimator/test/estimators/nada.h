@@ -24,6 +24,7 @@
 #include "modules/include/module_common_types.h"
 #include "modules/remote_bitrate_estimator/test/bwe.h"
 #include "rtc_base/constructormagic.h"
+#include "voice_engine/channel.h"
 
 namespace webrtc {
 

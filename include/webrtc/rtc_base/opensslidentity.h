@@ -92,6 +92,7 @@ class OpenSSLCertificate : public SSLCertificate {
                             size_t* length);
 
   bool GetSignatureDigestAlgorithm(std::string* algorithm) const override;
+  std::unique_ptr<SSLCertChain> GetChain() const override;
 
   int64_t CertificateExpirationTime() const override;
 
@@ -117,7 +118,6 @@ class OpenSSLIdentity : public SSLIdentity {
   ~OpenSSLIdentity() override;
 
   const OpenSSLCertificate& certificate() const override;
-  const SSLCertChain& cert_chain() const override;
   OpenSSLIdentity* GetReference() const override;
 
   // Configure an SSL context object to use our key and certificate.

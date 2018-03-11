@@ -16,12 +16,11 @@
 #include <deque>
 #include <utility>
 
-#include "modules/congestion_controller/delay_increase_detector_interface.h"
 #include "rtc_base/constructormagic.h"
 
 namespace webrtc {
 
-class TrendlineEstimator : public DelayIncreaseDetectorInterface {
+class TrendlineEstimator {
  public:
   // |window_size| is the number of points required to compute a trend line.
   // |smoothing_coef| controls how much we smooth out the delay before fitting
@@ -32,16 +31,13 @@ class TrendlineEstimator : public DelayIncreaseDetectorInterface {
   TrendlineEstimator(size_t window_size,
                      double smoothing_coef,
                      double threshold_gain);
-
-  ~TrendlineEstimator() override;
+  ~TrendlineEstimator();
 
   // Update the estimator with a new sample. The deltas should represent deltas
   // between timestamp groups as defined by the InterArrival class.
   void Update(double recv_delta_ms,
               double send_delta_ms,
-              int64_t arrival_time_ms) override;
-
-  BandwidthUsage State() const override;
+              int64_t arrival_time_ms);
 
   // Returns the estimated trend k multiplied by some gain.
   // 0 < k < 1   ->  the delay increases, queues are filling up
@@ -53,13 +49,6 @@ class TrendlineEstimator : public DelayIncreaseDetectorInterface {
   unsigned int num_of_deltas() const { return num_of_deltas_; }
 
  private:
-  void Detect(double offset,
-              double ts_delta,
-              int num_of_deltas,
-              int64_t now_ms);
-
-  void UpdateThreshold(double modified_offset, int64_t now_ms);
-
   // Parameters.
   const size_t window_size_;
   const double smoothing_coef_;
@@ -67,23 +56,13 @@ class TrendlineEstimator : public DelayIncreaseDetectorInterface {
   // Used by the existing threshold.
   unsigned int num_of_deltas_;
   // Keep the arrival times small by using the change from the first packet.
-  int64_t first_arrival_time_ms_;
+  int64_t first_arrival_time_ms;
   // Exponential backoff filtering.
   double accumulated_delay_;
   double smoothed_delay_;
   // Linear least squares regression.
   std::deque<std::pair<double, double>> delay_hist_;
   double trendline_;
-
-  const double k_up_;
-  const double k_down_;
-  double overusing_time_threshold_;
-  double threshold_;
-  int64_t last_update_ms_;
-  double prev_offset_;
-  double time_over_using_;
-  int overuse_counter_;
-  BandwidthUsage hypothesis_;
 
   RTC_DISALLOW_COPY_AND_ASSIGN(TrendlineEstimator);
 };

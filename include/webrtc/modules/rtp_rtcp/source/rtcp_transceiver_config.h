@@ -80,8 +80,6 @@ struct RtcpTransceiverConfig {
   //
   // Tuning parameters.
   //
-  // Initial state if |outgoing_transport| ready to accept packets.
-  bool initial_ready_to_send = true;
   // Delay before 1st periodic compound packet.
   int initial_report_delay_ms = 500;
 
@@ -95,11 +93,6 @@ struct RtcpTransceiverConfig {
   // Estimate RTT as non-sender as described in
   // https://tools.ietf.org/html/rfc3611#section-4.4 and #section-4.5
   bool non_sender_rtt_measurement = false;
-  // Copies LastSR/DelaySinceLastSR for previous report block to avoid
-  // triggering bug in older version of RtcpReceiver.
-  // TODO(bugs.webrtc.org/8805): Change to false by default then remove when
-  // all major webrtc clients updated with the fix in RtcpReceiver.
-  bool avoid_zero_last_sr_in_last_report_block = true;
 };
 
 }  // namespace webrtc

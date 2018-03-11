@@ -136,7 +136,7 @@ class MockVoiceDetection : public VoiceDetection {
   MOCK_CONST_METHOD0(frame_size_ms, int());
 };
 
-class MockAudioProcessing : public testing::NiceMock<AudioProcessing> {
+class MockAudioProcessing : public AudioProcessing {
  public:
   MockAudioProcessing()
       : echo_cancellation_(new testing::NiceMock<MockEchoCancellation>()),
@@ -197,10 +197,6 @@ class MockAudioProcessing : public testing::NiceMock<AudioProcessing> {
 
   virtual void AttachAecDump(std::unique_ptr<AecDump> aec_dump) {}
   MOCK_METHOD0(DetachAecDump, void());
-
-  virtual void AttachPlayoutAudioGenerator(
-      std::unique_ptr<AudioGenerator> audio_generator) {}
-  MOCK_METHOD0(DetachPlayoutAudioGenerator, void());
 
   MOCK_METHOD0(UpdateHistogramsOnCallEnd, void());
   MOCK_CONST_METHOD0(GetStatistics, AudioProcessingStatistics());

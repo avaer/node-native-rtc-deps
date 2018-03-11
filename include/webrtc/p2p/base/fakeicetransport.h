@@ -144,25 +144,12 @@ class FakeIceTransport : public IceTransportInternal {
   void AddRemoteCandidate(const Candidate& candidate) override {
     remote_candidates_.push_back(candidate);
   }
-  void RemoveRemoteCandidate(const Candidate& candidate) override {
-    auto it = std::find(remote_candidates_.begin(), remote_candidates_.end(),
-                        candidate);
-    if (it == remote_candidates_.end()) {
-      RTC_LOG(LS_INFO) << "Trying to remove a candidate which doesn't exist.";
-      return;
-    }
+  void RemoveRemoteCandidate(const Candidate& candidate) override {}
 
-    remote_candidates_.erase(it);
-  }
-
-  bool GetStats(ConnectionInfos* candidate_pair_stats_list,
-                CandidateStatsList* candidate_stats_list) override {
-    CandidateStats candidate_stats;
-    ConnectionInfo candidate_pair_stats;
-    candidate_stats_list->clear();
-    candidate_stats_list->push_back(candidate_stats);
-    candidate_pair_stats_list->clear();
-    candidate_pair_stats_list->push_back(candidate_pair_stats);
+  bool GetStats(ConnectionInfos* infos) override {
+    ConnectionInfo info;
+    infos->clear();
+    infos->push_back(info);
     return true;
   }
 
@@ -234,7 +221,7 @@ class FakeIceTransport : public IceTransportInternal {
     if (writable_ == writable) {
       return;
     }
-    RTC_LOG(INFO) << "Change writable_ to " << writable;
+    RTC_LOG(INFO) << "set_writable from:" << writable_ << " to " << writable;
     writable_ = writable;
     if (writable_) {
       SignalReadyToSend(this);

@@ -85,27 +85,15 @@ class VideoEncoder {
     int low;
     int high;
   };
-  // Quality scaling is enabled if thresholds are provided.
   struct ScalingSettings {
-   private:
-    // Private magic type for kOff, implicitly convertible to
-    // ScalingSettings.
-    struct KOff {};
-
-   public:
-    // TODO(nisse): Would be nicer if kOff were a constant ScalingSettings
-    // rather than a magic value. However, rtc::Optional is not trivially copy
-    // constructible, and hence a constant ScalingSettings needs a static
-    // initializer, which is strongly discouraged in Chrome. We can hopefully
-    // fix this when we switch to absl::optional or std::optional.
-    static constexpr KOff kOff = {};
-
-    ScalingSettings(int low, int high);
-    ScalingSettings(int low, int high, int min_pixels);
+    ScalingSettings(bool on, int low, int high);
+    ScalingSettings(bool on, int low, int high, int min_pixels);
+    ScalingSettings(bool on, int min_pixels);
+    explicit ScalingSettings(bool on);
     ScalingSettings(const ScalingSettings&);
-    ScalingSettings(KOff);  // NOLINT(runtime/explicit)
     ~ScalingSettings();
 
+    const bool enabled;
     const rtc::Optional<QpThresholds> thresholds;
 
     // We will never ask for a resolution lower than this.
@@ -113,11 +101,6 @@ class VideoEncoder {
     // on MediaCodec and fallback implementations are in place.
     // See https://bugs.chromium.org/p/webrtc/issues/detail?id=7206
     const int min_pixels_per_frame = 320 * 180;
-
-   private:
-    // Private constructor; to get an object without thresholds, use
-    // the magic constant ScalingSettings::kOff.
-    ScalingSettings();
   };
 
   static VideoCodecVP8 GetDefaultVp8Settings();
@@ -204,6 +187,7 @@ class VideoEncoder {
   // quality scaler must implement this method.
   virtual ScalingSettings GetScalingSettings() const;
 
+  virtual int32_t SetPeriodicKeyFrames(bool enable);
   virtual bool SupportsNativeHandle() const;
   virtual const char* ImplementationName() const;
 };

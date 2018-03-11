@@ -55,8 +55,6 @@ class AudioMixerImpl : public AudioMixer {
 
   ~AudioMixerImpl() override;
 
-  void SetLimiterType(FrameCombiner::LimiterType limiter_type);
-
   // AudioMixer functions
   bool AddSource(Source* audio_source) override;
   void RemoveSource(Source* audio_source) override;

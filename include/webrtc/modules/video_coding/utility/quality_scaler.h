@@ -43,9 +43,12 @@ class AdaptationObserverInterface {
 // signal an intent to scale up or down.
 class QualityScaler {
  public:
-  // Construct a QualityScaler with given |thresholds| and |observer|.
+  // Construct a QualityScaler with a given |observer|.
   // This starts the quality scaler periodically checking what the average QP
   // has been recently.
+  QualityScaler(AdaptationObserverInterface* observer,
+                VideoCodecType codec_type);
+  // If specific thresholds are desired these can be supplied as |thresholds|.
   QualityScaler(AdaptationObserverInterface* observer,
                 VideoEncoder::QpThresholds thresholds);
   virtual ~QualityScaler();

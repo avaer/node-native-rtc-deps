@@ -19,7 +19,8 @@
 #ifndef MODULES_AUDIO_CODING_CODECS_ISAC_MAIN_SOURCE_CODEC_H_
 #define MODULES_AUDIO_CODING_CODECS_ISAC_MAIN_SOURCE_CODEC_H_
 
-#include "modules/audio_coding/codecs/isac/main/source/structs.h"
+#include "structs.h"
+
 
 void WebRtcIsac_ResetBitstream(Bitstr* bit_stream);
 

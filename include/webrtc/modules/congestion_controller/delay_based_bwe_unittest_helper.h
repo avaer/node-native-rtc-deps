@@ -111,10 +111,10 @@ class StreamGenerator {
 };
 }  // namespace test
 
-class LegacyDelayBasedBweTest : public ::testing::Test {
+class DelayBasedBweTest : public ::testing::Test {
  public:
-  LegacyDelayBasedBweTest();
-  virtual ~LegacyDelayBasedBweTest();
+  DelayBasedBweTest();
+  virtual ~DelayBasedBweTest();
 
  protected:
   void AddDefaultStream();
@@ -171,7 +171,7 @@ class LegacyDelayBasedBweTest : public ::testing::Test {
   int64_t arrival_time_offset_ms_;
   bool first_update_;
 
-  RTC_DISALLOW_COPY_AND_ASSIGN(LegacyDelayBasedBweTest);
+  RTC_DISALLOW_COPY_AND_ASSIGN(DelayBasedBweTest);
 };
 }  // namespace webrtc
 

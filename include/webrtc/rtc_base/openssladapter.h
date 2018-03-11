@@ -31,6 +31,7 @@ class OpenSSLAdapterFactory;
 class OpenSSLAdapter : public SSLAdapter, public MessageHandler {
  public:
   static bool InitializeSSL(VerificationCallback callback);
+  static bool InitializeSSLThread();
   static bool CleanupSSL();
 
   explicit OpenSSLAdapter(AsyncSocket* socket,

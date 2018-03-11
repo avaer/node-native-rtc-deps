@@ -22,7 +22,7 @@
 extern "C" {
 #endif
 
-#include "modules/audio_coding/codecs/isac/fix/source/structs.h"
+#include "structs.h"
 
 void WebRtcIsacfix_GetVars(const int16_t *input,
                            const int16_t *pitchGains_Q12,

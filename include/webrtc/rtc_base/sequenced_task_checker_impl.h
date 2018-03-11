@@ -34,9 +34,6 @@ class SequencedTaskCheckerImpl {
   void Detach();
 
  private:
-  friend class internal::AnnounceOnThread;
-  bool IsCurrent() const { return CalledSequentially(); }
-
   typedef const void* QueueId;
   CriticalSection lock_;
   ThreadChecker thread_checker_;

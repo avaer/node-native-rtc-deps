@@ -19,8 +19,7 @@
 #define MODULES_AUDIO_CODING_CODECS_ILBC_MAIN_SOURCE_DEFINES_H_
 
 #include <string.h>
-
-#include "common_audio/signal_processing/include/signal_processing_library.h"
+#include "signal_processing_library.h"
 #include "typedefs.h"  // NOLINT(build/include)
 
 /* general codec settings */

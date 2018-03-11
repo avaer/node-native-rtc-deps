@@ -59,6 +59,8 @@ class WebRtcVoiceEngine final {
                                    const MediaConfig& config,
                                    const AudioOptions& options);
 
+  int GetInputLevel();
+
   const std::vector<AudioCodec>& send_codecs() const;
   const std::vector<AudioCodec>& recv_codecs() const;
   RtpCapabilities GetCapabilities() const;
@@ -120,7 +122,7 @@ class WebRtcVoiceEngine final {
 
   webrtc::AgcConfig default_agc_config_;
   // Cache received extended_filter_aec, delay_agnostic_aec, experimental_ns
-  // and intelligibility_enhancer values, and apply them
+  // level controller, and intelligibility_enhancer values, and apply them
   // in case they are missing in the audio options. We need to do this because
   // SetExtraOptions() will revert to defaults for options which are not
   // provided.
@@ -128,6 +130,7 @@ class WebRtcVoiceEngine final {
   rtc::Optional<bool> delay_agnostic_aec_;
   rtc::Optional<bool> experimental_ns_;
   rtc::Optional<bool> intelligibility_enhancer_;
+  rtc::Optional<bool> level_control_;
   // Jitter buffer settings for new streams.
   size_t audio_jitter_buffer_max_packets_ = 50;
   bool audio_jitter_buffer_fast_accelerate_ = false;
@@ -153,9 +156,8 @@ class WebRtcVoiceMediaChannel final : public VoiceMediaChannel,
   bool SetSendParameters(const AudioSendParameters& params) override;
   bool SetRecvParameters(const AudioRecvParameters& params) override;
   webrtc::RtpParameters GetRtpSendParameters(uint32_t ssrc) const override;
-  webrtc::RTCError SetRtpSendParameters(
-      uint32_t ssrc,
-      const webrtc::RtpParameters& parameters) override;
+  bool SetRtpSendParameters(uint32_t ssrc,
+                            const webrtc::RtpParameters& parameters) override;
   webrtc::RtpParameters GetRtpReceiveParameters(uint32_t ssrc) const override;
   bool SetRtpReceiveParameters(
       uint32_t ssrc,
@@ -171,6 +173,8 @@ class WebRtcVoiceMediaChannel final : public VoiceMediaChannel,
   bool RemoveSendStream(uint32_t ssrc) override;
   bool AddRecvStream(const StreamParams& sp) override;
   bool RemoveRecvStream(uint32_t ssrc) override;
+  bool GetActiveStreams(StreamList* actives) override;
+  int GetOutputLevel() override;
   // SSRC=0 will apply the new volume to current and future unsignaled streams.
   bool SetOutputVolume(uint32_t ssrc, double volume) override;
 
@@ -221,8 +225,7 @@ class WebRtcVoiceMediaChannel final : public VoiceMediaChannel,
   int CreateVoEChannel();
   bool DeleteVoEChannel(int channel);
   bool SetMaxSendBitrate(int bps);
-  webrtc::RTCError ValidateRtpParameters(
-      const webrtc::RtpParameters& parameters);
+  bool ValidateRtpParameters(const webrtc::RtpParameters& parameters);
   void SetupRecording();
   // Check if 'ssrc' is an unsignaled stream, and if so mark it as not being
   // unsignaled anymore (i.e. it is now removed, or signaled), and return true.

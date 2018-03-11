@@ -85,8 +85,11 @@ class SSLAdapter : public AsyncSocketAdapter {
 typedef bool (*VerificationCallback)(void* cert);
 
 // Call this on the main thread, before using SSL.
-// Call CleanupSSL when finished with SSL.
+// Call CleanupSSLThread when finished with SSL.
 bool InitializeSSL(VerificationCallback callback = nullptr);
+
+// Call to initialize additional threads.
+bool InitializeSSLThread();
 
 // Call to cleanup additional threads, and also the main thread.
 bool CleanupSSL();

@@ -14,14 +14,24 @@
 #include <string>
 #include <vector>
 
-#include "api/video_codecs/sdp_video_format.h"
 #include "common_types.h"  // NOLINT(build/include)
 #include "modules/video_coding/codecs/h264/include/h264_globals.h"
-#include "modules/video_coding/include/video_codec_interface.h"
+#include "modules/video_coding/codecs/test/packet_manipulator.h"
 
 namespace webrtc {
 namespace test {
 
+// Defines which frame types shall be excluded from packet loss and when.
+enum ExcludeFrameTypes {
+  // Will exclude the first keyframe in the video sequence from packet loss.
+  // Following keyframes will be targeted for packet loss.
+  kExcludeOnlyFirstKeyFrame,
+  // Exclude all keyframes from packet loss, no matter where in the video
+  // sequence they occur.
+  kExcludeAllKeyFrames
+};
+
+// Test configuration for a test run.
 struct TestConfig {
   class EncodedFrameChecker {
    public:
@@ -32,41 +42,49 @@ struct TestConfig {
   };
 
   void SetCodecSettings(VideoCodecType codec_type,
-                        size_t num_simulcast_streams,
-                        size_t num_spatial_layers,
-                        size_t num_temporal_layers,
+                        int num_temporal_layers,
+                        bool error_concealment_on,
                         bool denoising_on,
                         bool frame_dropper_on,
                         bool spatial_resize_on,
                         bool resilience_on,
-                        size_t width,
-                        size_t height);
+                        int width,
+                        int height);
 
-  size_t NumberOfCores() const;
-  size_t NumberOfTemporalLayers() const;
-  size_t NumberOfSpatialLayers() const;
-  size_t NumberOfSimulcastStreams() const;
-
-  std::vector<FrameType> FrameTypeForFrame(size_t frame_idx) const;
+  int NumberOfCores() const;
+  int NumberOfTemporalLayers() const;
+  int TemporalLayerForFrame(int frame_idx) const;
+  std::vector<FrameType> FrameTypeForFrame(int frame_idx) const;
   std::string ToString() const;
-  SdpVideoFormat ToSdpVideoFormat() const;
   std::string CodecName() const;
   std::string FilenameWithParams() const;
-  bool IsAsyncCodec() const;
 
   // Plain name of YUV file to process without file extension.
   std::string filename;
 
   // File to process. This must be a video file in the YUV format.
-  std::string filepath;
+  std::string input_filename;
+
+  // File to write to during processing for the test. Will be a video file in
+  // the YUV format.
+  std::string output_filename;
 
   // Number of frames to process.
-  size_t num_frames = 0;
+  int num_frames = 0;
 
-  // Bitstream constraints.
-  size_t max_payload_size_bytes = 1440;
+  // Configurations related to networking.
+  NetworkingConfig networking_config;
+
+  // Decides how the packet loss simulations shall exclude certain frames from
+  // packet loss.
+  ExcludeFrameTypes exclude_frame_types = kExcludeOnlyFirstKeyFrame;
 
   // Force the encoder and decoder to use a single core for processing.
+  // Using a single core is necessary to get a deterministic behavior for the
+  // encoded frames - using multiple cores will produce different encoded frames
+  // since multiple cores are competing to consume the byte budget for each
+  // frame in parallel.
+  // If set to false, the maximum number of available cores will be used.
   bool use_single_core = false;
 
   // Should cpu usage be measured?
@@ -74,7 +92,11 @@ struct TestConfig {
   bool measure_cpu = false;
 
   // If > 0: forces the encoder to create a keyframe every Nth frame.
-  size_t keyframe_interval = 0;
+  // Note that the encoder may create a keyframe in other locations in addition
+  // to this setting. Forcing key frames may also affect encoder planning
+  // optimizations in a negative way, since it will suddenly be forced to
+  // produce an expensive key frame.
+  int keyframe_interval = 0;
 
   // Codec settings to use.
   webrtc::VideoCodec codec_settings;
@@ -90,18 +112,12 @@ struct TestConfig {
   bool hw_encoder = false;
   bool hw_decoder = false;
 
-  // Should the encoder be wrapped in a SimulcastEncoderAdapter?
-  bool simulcast_adapted_encoder = false;
-
   // Should the hardware codecs be wrapped in software fallbacks?
   bool sw_fallback_encoder = false;
   bool sw_fallback_decoder = false;
 
   // Custom checker that will be called for each frame.
   const EncodedFrameChecker* encoded_frame_checker = nullptr;
-
-  // Print out frame level stats.
-  bool print_frame_level_stats = false;
 };
 
 }  // namespace test

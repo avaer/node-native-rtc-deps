@@ -21,7 +21,6 @@
 #include "api/turncustomizer.h"
 #include "pc/iceserverparsing.h"
 #include "pc/peerconnectionfactory.h"
-#include "pc/peerconnectioninternal.h"
 #include "pc/rtcstatscollector.h"
 #include "pc/rtptransceiver.h"
 #include "pc/statscollector.h"
@@ -33,6 +32,27 @@ namespace webrtc {
 class MediaStreamObserver;
 class VideoRtpReceiver;
 class RtcEventLog;
+
+// Statistics for all the transports of the session.
+// TODO(pthatcher): Think of a better name for this.  We already have
+// a TransportStats in transport.h.  Perhaps TransportsStats?
+struct SessionStats {
+  std::map<std::string, cricket::TransportStats> transport_stats;
+};
+
+struct ChannelNamePair {
+  ChannelNamePair(const std::string& content_name,
+                  const std::string& transport_name)
+      : content_name(content_name), transport_name(transport_name) {}
+  std::string content_name;
+  std::string transport_name;
+};
+
+struct ChannelNamePairs {
+  rtc::Optional<ChannelNamePair> voice;
+  rtc::Optional<ChannelNamePair> video;
+  rtc::Optional<ChannelNamePair> data;
+};
 
 // PeerConnection is the implementation of the PeerConnection object as defined
 // by the PeerConnectionInterface API surface.
@@ -48,7 +68,7 @@ class RtcEventLog;
 // - Generating offers and answers based on the current state.
 // - The ICE state machine.
 // - Generating stats.
-class PeerConnection : public PeerConnectionInternal,
+class PeerConnection : public PeerConnectionInterface,
                        public DataChannelProviderInterface,
                        public rtc::MessageHandler,
                        public sigslot::has_slots<> {
@@ -70,7 +90,7 @@ class PeerConnection : public PeerConnectionInternal,
 
   RTCErrorOr<rtc::scoped_refptr<RtpSenderInterface>> AddTrack(
       rtc::scoped_refptr<MediaStreamTrackInterface> track,
-      const std::vector<std::string>& stream_ids) override;
+      const std::vector<std::string>& stream_labels) override;
   rtc::scoped_refptr<RtpSenderInterface> AddTrack(
       MediaStreamTrackInterface* track,
       std::vector<MediaStreamInterface*> streams) override;
@@ -95,9 +115,6 @@ class PeerConnection : public PeerConnectionInternal,
   // has standardized method for getting this information.
   // See https://www.w3.org/TR/webrtc/#rtcdtlstransport-interface
   std::unique_ptr<rtc::SSLCertificate> GetRemoteAudioSSLCertificate();
-
-  // Version of the above method that returns the full certificate chain.
-  std::unique_ptr<rtc::SSLCertChain> GetRemoteAudioSSLCertChain();
 
   rtc::scoped_refptr<DtmfSenderInterface> CreateDtmfSender(
       AudioTrackInterface* track) override;
@@ -186,67 +203,91 @@ class PeerConnection : public PeerConnectionInternal,
 
   void Close() override;
 
-  // PeerConnectionInternal implementation.
-  rtc::Thread* network_thread() const override {
-    return factory_->network_thread();
-  }
-  rtc::Thread* worker_thread() const override {
-    return factory_->worker_thread();
-  }
-  rtc::Thread* signaling_thread() const override {
-    return factory_->signaling_thread();
-  }
+  sigslot::signal1<DataChannel*> SignalDataChannelCreated;
 
-  std::string session_id() const override { return session_id_; }
-
-  bool initial_offerer() const override {
-    return initial_offerer_ && *initial_offerer_;
-  }
-
-  std::vector<
-      rtc::scoped_refptr<RtpTransceiverProxyWithInternal<RtpTransceiver>>>
-  GetTransceiversInternal() const override {
-    return transceivers_;
-  }
-
-  bool GetLocalTrackIdBySsrc(uint32_t ssrc, std::string* track_id) override;
-  bool GetRemoteTrackIdBySsrc(uint32_t ssrc, std::string* track_id) override;
-
-  sigslot::signal1<DataChannel*>& SignalDataChannelCreated() override {
-    return SignalDataChannelCreated_;
-  }
-
-  cricket::RtpDataChannel* rtp_data_channel() const override {
-    return rtp_data_channel_;
-  }
-
-  std::vector<rtc::scoped_refptr<DataChannel>> sctp_data_channels()
-      const override {
+  // Virtual for unit tests.
+  virtual const std::vector<rtc::scoped_refptr<DataChannel>>&
+  sctp_data_channels() const {
     return sctp_data_channels_;
   }
 
-  rtc::Optional<std::string> sctp_content_name() const override {
-    return sctp_content_name_;
+  rtc::Thread* network_thread() const { return factory_->network_thread(); }
+  rtc::Thread* worker_thread() const { return factory_->worker_thread(); }
+  rtc::Thread* signaling_thread() const { return factory_->signaling_thread(); }
+
+  // The SDP session ID as defined by RFC 3264.
+  virtual const std::string& session_id() const { return session_id_; }
+
+  // Returns true if we were the initial offerer.
+  bool initial_offerer() const { return initial_offerer_ && *initial_offerer_; }
+
+  // Returns stats for all channels of all transports.
+  // This avoids exposing the internal structures used to track them.
+  // The parameterless version creates |ChannelNamePairs| from |voice_channel|,
+  // |video_channel| and |voice_channel| if available - this requires it to be
+  // called on the signaling thread - and invokes the other |GetStats|. The
+  // other |GetStats| can be invoked on any thread; if not invoked on the
+  // network thread a thread hop will happen.
+  std::unique_ptr<SessionStats> GetSessionStats_s();
+  virtual std::unique_ptr<SessionStats> GetSessionStats(
+      const ChannelNamePairs& channel_name_pairs);
+
+  // virtual so it can be mocked in unit tests
+  virtual bool GetLocalCertificate(
+      const std::string& transport_name,
+      rtc::scoped_refptr<rtc::RTCCertificate>* certificate);
+  virtual std::unique_ptr<rtc::SSLCertificate> GetRemoteSSLCertificate(
+      const std::string& transport_name);
+
+  virtual Call::Stats GetCallStats();
+
+  // Exposed for stats collecting.
+  // TODO(steveanton): Switch callers to use the plural form and remove these.
+  virtual cricket::VoiceChannel* voice_channel() const {
+    if (IsUnifiedPlan()) {
+      // TODO(steveanton): Change stats collection to work with transceivers.
+      return nullptr;
+    }
+    return static_cast<cricket::VoiceChannel*>(
+        GetAudioTransceiver()->internal()->channel());
+  }
+  virtual cricket::VideoChannel* video_channel() const {
+    if (IsUnifiedPlan()) {
+      // TODO(steveanton): Change stats collection to work with transceivers.
+      return nullptr;
+    }
+    return static_cast<cricket::VideoChannel*>(
+        GetVideoTransceiver()->internal()->channel());
   }
 
-  rtc::Optional<std::string> sctp_transport_name() const override {
+  // Only valid when using deprecated RTP data channels.
+  virtual cricket::RtpDataChannel* rtp_data_channel() {
+    return rtp_data_channel_;
+  }
+  virtual rtc::Optional<std::string> sctp_content_name() const {
+    return sctp_content_name_;
+  }
+  virtual rtc::Optional<std::string> sctp_transport_name() const {
     return sctp_transport_name_;
   }
 
-  cricket::CandidateStatsList GetPooledCandidateStats() const override;
-  std::map<std::string, std::string> GetTransportNamesByMid() const override;
-  std::map<std::string, cricket::TransportStats> GetTransportStatsByNames(
-      const std::set<std::string>& transport_names) override;
-  Call::Stats GetCallStats() override;
+  // Get the id used as a media stream track's "id" field from ssrc.
+  virtual bool GetLocalTrackIdBySsrc(uint32_t ssrc, std::string* track_id);
+  virtual bool GetRemoteTrackIdBySsrc(uint32_t ssrc, std::string* track_id);
 
-  bool GetLocalCertificate(
-      const std::string& transport_name,
-      rtc::scoped_refptr<rtc::RTCCertificate>* certificate) override;
-  std::unique_ptr<rtc::SSLCertChain> GetRemoteSSLCertChain(
-      const std::string& transport_name) override;
-  bool IceRestartPending(const std::string& content_name) const override;
-  bool NeedsIceRestart(const std::string& content_name) const override;
-  bool GetSslRole(const std::string& content_name, rtc::SSLRole* role) override;
+  // Returns true if there was an ICE restart initiated by the remote offer.
+  bool IceRestartPending(const std::string& content_name) const;
+
+  // Returns true if the ICE restart flag above was set, and no ICE restart has
+  // occurred yet for this transport (by applying a local description with
+  // changed ufrag/password). If the transport has been deleted as a result of
+  // bundling, returns false.
+  bool NeedsIceRestart(const std::string& content_name) const;
+
+  // Get SSL role for an arbitrary m= section (handles bundling correctly).
+  // TODO(deadbeef): This is only used internally by the session description
+  // factory, it shouldn't really be public).
+  bool GetSslRole(const std::string& content_name, rtc::SSLRole* role);
 
  protected:
   ~PeerConnection() override;
@@ -257,29 +298,37 @@ class PeerConnection : public PeerConnectionInternal,
 
   struct RtpSenderInfo {
     RtpSenderInfo() : first_ssrc(0) {}
-    RtpSenderInfo(const std::string& stream_id,
+    RtpSenderInfo(const std::string& stream_label,
                   const std::string sender_id,
                   uint32_t ssrc)
-        : stream_id(stream_id), sender_id(sender_id), first_ssrc(ssrc) {}
+        : stream_label(stream_label), sender_id(sender_id), first_ssrc(ssrc) {}
     bool operator==(const RtpSenderInfo& other) {
-      return this->stream_id == other.stream_id &&
+      return this->stream_label == other.stream_label &&
              this->sender_id == other.sender_id &&
              this->first_ssrc == other.first_ssrc;
     }
-    std::string stream_id;
+    std::string stream_label;
     std::string sender_id;
     // An RtpSender can have many SSRCs. The first one is used as a sort of ID
     // for communicating with the lower layers.
     uint32_t first_ssrc;
   };
 
+  struct TrackEvent {
+    rtc::scoped_refptr<RtpReceiverInterface> receiver;
+    std::vector<rtc::scoped_refptr<MediaStreamInterface>> streams;
+  };
+
   // Implements MessageHandler.
   void OnMessage(rtc::Message* msg) override;
 
-  // Plan B helpers for getting the voice/video media channels for the single
-  // audio/video transceiver, if it exists.
-  cricket::VoiceMediaChannel* voice_media_channel() const;
-  cricket::VideoMediaChannel* video_media_channel() const;
+  cricket::VoiceMediaChannel* voice_media_channel() const {
+    return voice_channel() ? voice_channel()->media_channel() : nullptr;
+  }
+
+  cricket::VideoMediaChannel* video_media_channel() const {
+    return video_channel() ? video_channel()->media_channel() : nullptr;
+  }
 
   std::vector<rtc::scoped_refptr<RtpSenderProxyWithInternal<RtpSenderInternal>>>
   GetSendersInternal() const;
@@ -291,9 +340,6 @@ class PeerConnection : public PeerConnectionInternal,
   GetAudioTransceiver() const;
   rtc::scoped_refptr<RtpTransceiverProxyWithInternal<RtpTransceiver>>
   GetVideoTransceiver() const;
-
-  rtc::scoped_refptr<RtpTransceiverProxyWithInternal<RtpTransceiver>>
-  GetFirstAudioTransceiver() const;
 
   void CreateAudioReceiver(MediaStreamInterface* stream,
                            const RtpSenderInfo& remote_sender_info);
@@ -315,11 +361,11 @@ class PeerConnection : public PeerConnectionInternal,
   // AddTrack implementation when Unified Plan is specified.
   RTCErrorOr<rtc::scoped_refptr<RtpSenderInterface>> AddTrackUnifiedPlan(
       rtc::scoped_refptr<MediaStreamTrackInterface> track,
-      const std::vector<std::string>& stream_ids);
+      const std::vector<std::string>& stream_labels);
   // AddTrack implementation when Plan B is specified.
   RTCErrorOr<rtc::scoped_refptr<RtpSenderInterface>> AddTrackPlanB(
       rtc::scoped_refptr<MediaStreamTrackInterface> track,
-      const std::vector<std::string>& stream_ids);
+      const std::vector<std::string>& stream_labels);
 
   // Returns the first RtpTransceiver suitable for a newly added track, if such
   // transceiver is available.
@@ -333,18 +379,15 @@ class PeerConnection : public PeerConnectionInternal,
   rtc::scoped_refptr<RtpTransceiverProxyWithInternal<RtpTransceiver>>
   FindTransceiverBySender(rtc::scoped_refptr<RtpSenderInterface> sender);
 
-  // Internal implementation for AddTransceiver family of methods. If
-  // |fire_callback| is set, fires OnRenegotiationNeeded callback if successful.
   RTCErrorOr<rtc::scoped_refptr<RtpTransceiverInterface>> AddTransceiver(
       cricket::MediaType media_type,
       rtc::scoped_refptr<MediaStreamTrackInterface> track,
-      const RtpTransceiverInit& init,
-      bool fire_callback = true);
+      const RtpTransceiverInit& init);
 
   rtc::scoped_refptr<RtpSenderProxyWithInternal<RtpSenderInternal>>
   CreateSender(cricket::MediaType media_type,
                rtc::scoped_refptr<MediaStreamTrackInterface> track,
-               const std::vector<std::string>& stream_ids);
+               const std::vector<std::string>& stream_labels);
 
   rtc::scoped_refptr<RtpReceiverProxyWithInternal<RtpReceiverInternal>>
   CreateReceiver(cricket::MediaType media_type, const std::string& receiver_id);
@@ -382,10 +425,10 @@ class PeerConnection : public PeerConnectionInternal,
   void PostSetSessionDescriptionSuccess(
       SetSessionDescriptionObserver* observer);
   void PostSetSessionDescriptionFailure(SetSessionDescriptionObserver* observer,
-                                        RTCError&& error);
+                                        const std::string& error);
   void PostCreateSessionDescriptionFailure(
       CreateSessionDescriptionObserver* observer,
-      RTCError error);
+      const std::string& error);
 
   // Synchronous implementations of SetLocalDescription/SetRemoteDescription
   // that return an RTCError instead of invoking a callback.
@@ -398,9 +441,8 @@ class PeerConnection : public PeerConnectionInternal,
   // part of setting the local/remote description.
   RTCError UpdateTransceiversAndDataChannels(
       cricket::ContentSource source,
-      const SessionDescriptionInterface& new_session,
-      const SessionDescriptionInterface* old_local_description,
-      const SessionDescriptionInterface* old_remote_description);
+      const SessionDescriptionInterface* old_session,
+      const SessionDescriptionInterface& new_session);
 
   // Either creates or destroys the transceiver's BaseChannel according to the
   // given media section.
@@ -420,11 +462,9 @@ class PeerConnection : public PeerConnectionInternal,
   RTCErrorOr<
       rtc::scoped_refptr<RtpTransceiverProxyWithInternal<RtpTransceiver>>>
   AssociateTransceiver(cricket::ContentSource source,
-                       SdpType type,
                        size_t mline_index,
                        const cricket::ContentInfo& content,
-                       const cricket::ContentInfo* old_local_content,
-                       const cricket::ContentInfo* old_remote_content);
+                       const cricket::ContentInfo* old_content);
 
   // Returns the RtpTransceiver, if found, that is associated to the given MID.
   rtc::scoped_refptr<RtpTransceiverProxyWithInternal<RtpTransceiver>>
@@ -449,8 +489,6 @@ class PeerConnection : public PeerConnectionInternal,
           transceiver,
       const SessionDescriptionInterface* sdesc) const;
 
-  void OnNegotiationNeeded();
-
   bool IsClosed() const {
     return signaling_state_ == PeerConnectionInterface::kClosed;
   }
@@ -468,14 +506,6 @@ class PeerConnection : public PeerConnectionInternal,
       const PeerConnectionInterface::RTCOfferAnswerOptions&
           offer_answer_options,
       cricket::MediaSessionOptions* session_options);
-
-  RTCError HandleLegacyOfferOptions(const RTCOfferAnswerOptions& options);
-  void RemoveRecvDirectionFromReceivingTransceiversOfType(
-      cricket::MediaType media_type);
-  void AddUpToOneReceivingTransceiverOfType(cricket::MediaType media_type);
-  std::vector<
-      rtc::scoped_refptr<RtpTransceiverProxyWithInternal<RtpTransceiver>>>
-  GetReceivingTransceiversOfType(cricket::MediaType media_type);
 
   // Returns a MediaSessionOptions struct with options decided by
   // |constraints|, the local MediaStreams and DataChannels.
@@ -627,7 +657,7 @@ class PeerConnection : public PeerConnectionInternal,
   std::vector<RtpSenderInfo>* GetLocalSenderInfos(
       cricket::MediaType media_type);
   const RtpSenderInfo* FindSenderInfo(const std::vector<RtpSenderInfo>& infos,
-                                      const std::string& stream_id,
+                                      const std::string& stream_label,
                                       const std::string sender_id) const;
 
   // Returns the specified SCTP DataChannel in sctp_data_channels_,
@@ -644,8 +674,7 @@ class PeerConnection : public PeerConnectionInternal,
       IceTransportsType type,
       int candidate_pool_size,
       bool prune_turn_ports,
-      webrtc::TurnCustomizer* turn_customizer,
-      rtc::Optional<int> stun_candidate_keepalive_interval);
+      webrtc::TurnCustomizer* turn_customizer);
 
   // Starts output of an RTC event log to the given output object.
   // This function should only be called from the worker thread.
@@ -704,6 +733,9 @@ class PeerConnection : public PeerConnectionInternal,
   cricket::TransportController* transport_controller() const {
     return transport_controller_.get();
   }
+
+  // Return all managed, non-null channels.
+  std::vector<cricket::BaseChannel*> Channels() const;
 
   // Non-const versions of local_description()/remote_description(), for use
   // internally.
@@ -791,6 +823,9 @@ class PeerConnection : public PeerConnectionInternal,
   bool CreateDataChannel(const std::string& mid,
                          const std::string& transport_name);
 
+  std::unique_ptr<SessionStats> GetSessionStats_n(
+      const ChannelNamePairs& channel_name_pairs);
+
   bool CreateSctpTransport_n(const std::string& content_name,
                              const std::string& transport_name);
   // For bundling.
@@ -851,13 +886,6 @@ class PeerConnection : public PeerConnectionInternal,
   const char* SessionErrorToString(SessionError error) const;
   std::string GetSessionErrorMsg();
 
-  // Report the UMA metric SdpFormatReceived for the given remote offer.
-  void ReportSdpFormatReceived(const SessionDescriptionInterface& remote_offer);
-
-  // Report inferred negotiated SDP semantics from a local/remote answer to the
-  // UMA observer.
-  void ReportNegotiatedSdpSemantics(const SessionDescriptionInterface& answer);
-
   // Invoked when TransportController connection completion is signaled.
   // Reports stats for all transports in use.
   void ReportTransportStats();
@@ -865,8 +893,7 @@ class PeerConnection : public PeerConnectionInternal,
   // Gather the usage of IPv4/IPv6 as best connection.
   void ReportBestConnectionState(const cricket::TransportStats& stats);
 
-  void ReportNegotiatedCiphers(const cricket::TransportStats& stats,
-                               const std::set<cricket::MediaType>& media_types);
+  void ReportNegotiatedCiphers(const cricket::TransportStats& stats);
 
   void OnSentPacket_w(const rtc::SentPacket& sent_packet);
 
@@ -886,8 +913,6 @@ class PeerConnection : public PeerConnectionInternal,
   // Destroys the given BaseChannel. The channel cannot be accessed after this
   // method is called.
   void DestroyBaseChannel(cricket::BaseChannel* channel);
-
-  sigslot::signal1<DataChannel*> SignalDataChannelCreated_;
 
   // Storing the factory as a scoped reference pointer ensures that the memory
   // in the PeerConnectionFactoryImpl remains available as long as the

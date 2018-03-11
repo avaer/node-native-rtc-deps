@@ -18,7 +18,9 @@
 #ifndef MODULES_AUDIO_CODING_CODECS_ISAC_MAIN_SOURCE_PITCH_ESTIMATOR_H_
 #define MODULES_AUDIO_CODING_CODECS_ISAC_MAIN_SOURCE_PITCH_ESTIMATOR_H_
 
-#include "modules/audio_coding/codecs/isac/main/source/structs.h"
+#include "structs.h"
+
+
 
 void WebRtcIsac_PitchAnalysis(const double *in,               /* PITCH_FRAME_LEN samples */
                               double *out,                    /* PITCH_FRAME_LEN+QLOOKAHEAD samples */

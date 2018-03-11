@@ -1,4 +1,3 @@
-
 /*
  *  Copyright 2011 The WebRTC project authors. All Rights Reserved.
  *
@@ -58,8 +57,8 @@ class PeerConnectionFactory : public PeerConnectionFactoryInterface {
 
   bool Initialize();
 
-  rtc::scoped_refptr<MediaStreamInterface> CreateLocalMediaStream(
-      const std::string& stream_id) override;
+  rtc::scoped_refptr<MediaStreamInterface>
+      CreateLocalMediaStream(const std::string& label) override;
 
   rtc::scoped_refptr<AudioSourceInterface> CreateAudioSource(
       const cricket::AudioOptions& options) override;
@@ -90,8 +89,7 @@ class PeerConnectionFactory : public PeerConnectionFactoryInterface {
 
   virtual cricket::TransportController* CreateTransportController(
       cricket::PortAllocator* port_allocator,
-      bool redetermine_role_on_ice_restart,
-      RtcEventLog* event_log = nullptr);
+      bool redetermine_role_on_ice_restart);
 
   virtual std::unique_ptr<cricket::SctpTransportInternalFactory>
   CreateSctpTransportInternalFactory();
@@ -110,14 +108,6 @@ class PeerConnectionFactory : public PeerConnectionFactoryInterface {
       std::unique_ptr<cricket::MediaEngineInterface> media_engine,
       std::unique_ptr<webrtc::CallFactoryInterface> call_factory,
       std::unique_ptr<RtcEventLogFactoryInterface> event_log_factory);
-  PeerConnectionFactory(
-      rtc::Thread* network_thread,
-      rtc::Thread* worker_thread,
-      rtc::Thread* signaling_thread,
-      std::unique_ptr<cricket::MediaEngineInterface> media_engine,
-      std::unique_ptr<webrtc::CallFactoryInterface> call_factory,
-      std::unique_ptr<RtcEventLogFactoryInterface> event_log_factory,
-      std::unique_ptr<FecControllerFactoryInterface> fec_controller_factory);
   virtual ~PeerConnectionFactory();
 
  private:
@@ -137,7 +127,6 @@ class PeerConnectionFactory : public PeerConnectionFactoryInterface {
   std::unique_ptr<cricket::MediaEngineInterface> media_engine_;
   std::unique_ptr<webrtc::CallFactoryInterface> call_factory_;
   std::unique_ptr<RtcEventLogFactoryInterface> event_log_factory_;
-  std::unique_ptr<FecControllerFactoryInterface> fec_controller_factory_;
 };
 
 }  // namespace webrtc

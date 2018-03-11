@@ -16,7 +16,6 @@
 #include <string>
 #include <vector>
 
-#include "api/fakemetricsobserver.h"
 #include "api/peerconnectioninterface.h"
 #include "pc/test/mockpeerconnectionobservers.h"
 #include "rtc_base/function_view.h"
@@ -98,20 +97,16 @@ class PeerConnectionWrapper {
   // generating the offer and the given PeerConnectionWrapper generating the
   // answer.
   // Equivalent to:
-  // 1. this->CreateOffer(offer_options)
+  // 1. this->CreateOffer()
   // 2. this->SetLocalDescription(offer)
   // 3. answerer->SetRemoteDescription(offer)
-  // 4. answerer->CreateAnswer(answer_options)
+  // 4. answerer->CreateAnswer()
   // 5. answerer->SetLocalDescription(answer)
   // 6. this->SetRemoteDescription(answer)
   // Returns true if all steps succeed, false otherwise.
   // Suggested usage:
   //   ASSERT_TRUE(caller->ExchangeOfferAnswerWith(callee.get()));
   bool ExchangeOfferAnswerWith(PeerConnectionWrapper* answerer);
-  bool ExchangeOfferAnswerWith(
-      PeerConnectionWrapper* answerer,
-      const PeerConnectionInterface::RTCOfferAnswerOptions& offer_options,
-      const PeerConnectionInterface::RTCOfferAnswerOptions& answer_options);
 
   // The following are wrappers for the underlying PeerConnection's
   // AddTransceiver method. They return the result of calling AddTransceiver
@@ -139,19 +134,19 @@ class PeerConnectionWrapper {
   // AddTrack fails.
   rtc::scoped_refptr<RtpSenderInterface> AddTrack(
       rtc::scoped_refptr<MediaStreamTrackInterface> track,
-      const std::vector<std::string>& stream_ids = {});
+      const std::vector<std::string>& stream_labels = {});
 
   // Calls the underlying PeerConnection's AddTrack method with an audio media
   // stream track not bound to any source.
   rtc::scoped_refptr<RtpSenderInterface> AddAudioTrack(
       const std::string& track_label,
-      const std::vector<std::string>& stream_ids = {});
+      const std::vector<std::string>& stream_labels = {});
 
   // Calls the underlying PeerConnection's AddTrack method with a video media
   // stream track fed by a fake video capturer.
   rtc::scoped_refptr<RtpSenderInterface> AddVideoTrack(
       const std::string& track_label,
-      const std::vector<std::string>& stream_ids = {});
+      const std::vector<std::string>& stream_labels = {});
 
   // Calls the underlying PeerConnection's CreateDataChannel method with default
   // initialization parameters.
@@ -171,10 +166,6 @@ class PeerConnectionWrapper {
   // report. If GetStats() fails, this method returns null and fails the test.
   rtc::scoped_refptr<const RTCStatsReport> GetStats();
 
-  // Creates a new FakeMetricsObserver and registers it with the PeerConnection
-  // as the UMA observer.
-  rtc::scoped_refptr<FakeMetricsObserver> RegisterFakeMetricsObserver();
-
  private:
   std::unique_ptr<SessionDescriptionInterface> CreateSdp(
       rtc::FunctionView<void(CreateSessionDescriptionObserver*)> fn,
@@ -185,7 +176,6 @@ class PeerConnectionWrapper {
   rtc::scoped_refptr<PeerConnectionFactoryInterface> pc_factory_;
   std::unique_ptr<MockPeerConnectionObserver> observer_;
   rtc::scoped_refptr<PeerConnectionInterface> pc_;
-  rtc::scoped_refptr<FakeMetricsObserver> fake_metrics_observer_;
 };
 
 }  // namespace webrtc

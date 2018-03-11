@@ -19,7 +19,8 @@
 #ifndef MODULES_AUDIO_CODING_CODECS_ISAC_FIX_SOURCE_BANDWIDTH_ESTIMATOR_H_
 #define MODULES_AUDIO_CODING_CODECS_ISAC_FIX_SOURCE_BANDWIDTH_ESTIMATOR_H_
 
-#include "modules/audio_coding/codecs/isac/fix/source/structs.h"
+#include "structs.h"
+
 
 /****************************************************************************
  * WebRtcIsacfix_InitBandwidthEstimator(...)

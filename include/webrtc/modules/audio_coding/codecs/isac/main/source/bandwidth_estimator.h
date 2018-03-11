@@ -19,8 +19,9 @@
 #ifndef MODULES_AUDIO_CODING_CODECS_ISAC_MAIN_SOURCE_BANDWIDTH_ESTIMATOR_H_
 #define MODULES_AUDIO_CODING_CODECS_ISAC_MAIN_SOURCE_BANDWIDTH_ESTIMATOR_H_
 
-#include "modules/audio_coding/codecs/isac/main/source/settings.h"
-#include "modules/audio_coding/codecs/isac/main/source/structs.h"
+#include "structs.h"
+#include "settings.h"
+
 
 #define MIN_ISAC_BW     10000
 #define MIN_ISAC_BW_LB  10000

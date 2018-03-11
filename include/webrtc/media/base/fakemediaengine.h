@@ -145,17 +145,16 @@ template <class Base> class RtpHelper : public Base {
     }
     return webrtc::RtpParameters();
   }
-  virtual webrtc::RTCError SetRtpSendParameters(
-      uint32_t ssrc,
-      const webrtc::RtpParameters& parameters) {
+  virtual bool SetRtpSendParameters(uint32_t ssrc,
+                                    const webrtc::RtpParameters& parameters) {
     auto parameters_iterator = rtp_send_parameters_.find(ssrc);
     if (parameters_iterator != rtp_send_parameters_.end()) {
       parameters_iterator->second = parameters;
-      return webrtc::RTCError::OK();
+      return true;
     }
     // Replicate the behavior of the real media channel: return false
     // when setting parameters for unknown SSRCs.
-    return webrtc::RTCError(webrtc::RTCErrorType::INTERNAL_ERROR);
+    return false;
   }
 
   virtual webrtc::RtpParameters GetRtpReceiveParameters(uint32_t ssrc) const {
@@ -381,6 +380,9 @@ class FakeVoiceMediaChannel : public RtpHelper<VoiceMediaChannel> {
     output_scalings_.erase(ssrc);
     return true;
   }
+
+  virtual bool GetActiveStreams(StreamList* streams) { return true; }
+  virtual int GetOutputLevel() { return 0; }
 
   virtual bool CanInsertDtmf() {
     for (std::vector<AudioCodec>::const_iterator it = send_codecs_.begin();

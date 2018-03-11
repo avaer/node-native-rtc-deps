@@ -19,7 +19,7 @@
 #ifndef MODULES_AUDIO_CODING_CODECS_ILBC_MAIN_SOURCE_CREATE_AUGMENTED_VEC_H_
 #define MODULES_AUDIO_CODING_CODECS_ILBC_MAIN_SOURCE_CREATE_AUGMENTED_VEC_H_
 
-#include "modules/audio_coding/codecs/ilbc/defines.h"
+#include "defines.h"
 
 /*----------------------------------------------------------------*
  *  Recreate a specific codebook vector from the augmented part.

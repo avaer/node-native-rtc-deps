@@ -19,7 +19,7 @@
 #ifndef MODULES_AUDIO_CODING_CODECS_ILBC_MAIN_SOURCE_HP_INPUT_H_
 #define MODULES_AUDIO_CODING_CODECS_ILBC_MAIN_SOURCE_HP_INPUT_H_
 
-#include "modules/audio_coding/codecs/ilbc/defines.h"
+#include "defines.h"
 
 void WebRtcIlbcfix_HpInput(
     int16_t *signal,     /* (i/o) signal vector */

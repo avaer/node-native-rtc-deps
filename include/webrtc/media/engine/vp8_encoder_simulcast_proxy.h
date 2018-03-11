@@ -42,6 +42,7 @@ class VP8EncoderSimulcastProxy : public VP8Encoder {
 
   VideoEncoder::ScalingSettings GetScalingSettings() const override;
 
+  int32_t SetPeriodicKeyFrames(bool enable) override;
   bool SupportsNativeHandle() const override;
   const char* ImplementationName() const override;
 

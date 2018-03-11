@@ -18,9 +18,9 @@
 #ifndef MODULES_AUDIO_CODING_CODECS_ISAC_MAIN_SOURCE_LPC_TABLES_H_
 #define MODULES_AUDIO_CODING_CODECS_ISAC_MAIN_SOURCE_LPC_TABLES_H_
 
-#include "modules/audio_coding/codecs/isac/main/source/structs.h"
+#include "structs.h"
 
-#include "modules/audio_coding/codecs/isac/main/source/settings.h"
+#include "settings.h"
 
 #define KLT_STEPSIZE         1.00000000
 #define KLT_NUM_AVG_GAIN     0

@@ -20,7 +20,6 @@
 #ifndef P2P_BASE_P2PTRANSPORTCHANNEL_H_
 #define P2P_BASE_P2PTRANSPORTCHANNEL_H_
 
-#include <algorithm>
 #include <map>
 #include <memory>
 #include <set>
@@ -28,8 +27,6 @@
 #include <vector>
 
 #include "api/candidate.h"
-#include "logging/rtc_event_log/events/rtc_event_ice_candidate_pair_config.h"
-#include "logging/rtc_event_log/icelogger.h"
 #include "p2p/base/candidatepairinterface.h"
 #include "p2p/base/icetransportinternal.h"
 #include "p2p/base/portallocator.h"
@@ -38,10 +35,6 @@
 #include "rtc_base/constructormagic.h"
 #include "rtc_base/random.h"
 #include "rtc_base/sigslot.h"
-
-namespace webrtc {
-class RtcEventLog;
-}  // namespace webrtc
 
 namespace cricket {
 
@@ -79,8 +72,7 @@ class P2PTransportChannel : public IceTransportInternal,
  public:
   P2PTransportChannel(const std::string& transport_name,
                       int component,
-                      PortAllocator* allocator,
-                      webrtc::RtcEventLog* event_log = nullptr);
+                      PortAllocator* allocator);
   ~P2PTransportChannel() override;
 
   // From TransportChannelImpl:
@@ -119,8 +111,7 @@ class P2PTransportChannel : public IceTransportInternal,
   int SetOption(rtc::Socket::Option opt, int value) override;
   bool GetOption(rtc::Socket::Option opt, int* value) override;
   int GetError() override;
-  bool GetStats(std::vector<ConnectionInfo>* candidate_pair_stats_list,
-                std::vector<CandidateStats>* candidate_stats_list) override;
+  bool GetStats(std::vector<ConnectionInfo>* stats) override;
   rtc::Optional<int> GetRttEstimate() override;
 
   // TODO(honghaiz): Remove this method once the reference of it in
@@ -181,15 +172,19 @@ class P2PTransportChannel : public IceTransportInternal,
   bool weak() const;
 
   int weak_ping_interval() const {
-    return std::max(config_.ice_check_interval_weak_connectivity.value_or(
-                        weak_ping_interval_),
-                    config_.ice_check_min_interval.value_or(-1));
+    if (config_.ice_check_min_interval &&
+        weak_ping_interval_ < *config_.ice_check_min_interval) {
+      return *config_.ice_check_min_interval;
+    }
+    return weak_ping_interval_;
   }
 
   int strong_ping_interval() const {
-    return std::max(config_.ice_check_interval_strong_connectivity.value_or(
-                        STRONG_PING_INTERVAL),
-                    config_.ice_check_min_interval.value_or(-1));
+    if (config_.ice_check_min_interval &&
+        STRONG_PING_INTERVAL < *config_.ice_check_min_interval) {
+      return *config_.ice_check_min_interval;
+    }
+    return STRONG_PING_INTERVAL;
   }
 
   // Returns true if it's possible to send packets on |connection|.
@@ -199,11 +194,6 @@ class P2PTransportChannel : public IceTransportInternal,
   // Start pinging if we haven't already started, and we now have a connection
   // that's pingable.
   void MaybeStartPinging();
-
-  int CompareCandidatePairNetworks(
-      const Connection* a,
-      const Connection* b,
-      rtc::Optional<rtc::AdapterType> network_preference) const;
 
   // The methods below return a positive value if |a| is preferable to |b|,
   // a negative value if |b| is preferable, and 0 if they're equally preferable.
@@ -297,9 +287,6 @@ class P2PTransportChannel : public IceTransportInternal,
   void OnCheckAndPing();
   void OnRegatherOnFailedNetworks();
   void OnRegatherOnAllNetworks();
-
-  void LogCandidatePairEvent(Connection* conn,
-                             webrtc::IceCandidatePairEventType type);
 
   uint32_t GetNominationAttr(Connection* conn) const;
   bool GetUseCandidateAttr(Connection* conn, NominationMode mode) const;
@@ -421,8 +408,6 @@ class P2PTransportChannel : public IceTransportInternal,
   webrtc::MetricsObserverInterface* metrics_observer_ = nullptr;
 
   rtc::Optional<rtc::NetworkRoute> network_route_;
-
-  webrtc::IceEventLog ice_event_log_;
 
   RTC_DISALLOW_COPY_AND_ASSIGN(P2PTransportChannel);
 };
